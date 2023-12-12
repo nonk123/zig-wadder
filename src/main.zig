@@ -1,30 +1,37 @@
 const std = @import("std");
 
 const wad = @import("wad.zig");
+const map = @import("map.zig");
+
+pub const Texture = struct {};
+
+pub const Resources = struct {
+    currentLevel: map.Map,
+    textures: std.AutoHashMap([]u8, Texture),
+};
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
-    var arena = std.heap.ArenaAllocator.init(gpa.allocator());
-    defer arena.deinit();
+    var wadArena = std.heap.ArenaAllocator.init(gpa.allocator());
+    defer wadArena.deinit();
 
-    var testWad = try wad.Wad.readFromFile("test.wad", arena.allocator());
-    defer testWad.deinit(arena.allocator());
+    const wadAlloc = wadArena.allocator();
 
-    std.debug.print("{s} lumps:\n\n", .{testWad.identification});
+    var testWad = try wad.Wad.readFromFile("test.wad", wadAlloc);
+    defer testWad.deinit(wadAlloc);
 
-    var sumMb: f32 = 0.0;
+    var iwad = try wad.Wad.readFromFile("DOOM2.WAD", wadAlloc);
+    defer iwad.deinit(wadAlloc);
 
-    for (testWad.lumps) |lump| {
-        const b = lump.data.len;
-        const k = @as(f32, @floatFromInt(b)) / 1024.0;
-        const m = k / 1024.0;
+    var mapArena = std.heap.ArenaAllocator.init(gpa.allocator());
+    defer mapArena.deinit();
 
-        sumMb += m;
+    const mapAlloc = mapArena.allocator();
 
-        std.debug.print("Lump {s}: {}B {d:.2}K {d:.2}M\n", .{ lump.name, b, k, m });
-    }
+    var level = try map.Map.loadByName(&iwad, "MAP01", mapAlloc);
+    defer level.deinit(mapAlloc);
 
-    std.debug.print("\n{d:.2}M total\n", .{sumMb});
+    level.debugAsciiArt(64, 64, 32, 0, 32);
 }
