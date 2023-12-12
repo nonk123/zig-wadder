@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const raySdk = @import("raylib/src/build.zig");
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
 
@@ -13,6 +15,10 @@ pub fn build(b: *std.Build) void {
     });
 
     b.installArtifact(exe);
+
+    var raylib = raySdk.addRaylib(b, target, optimize, .{});
+    exe.addIncludePath(.{ .path = "raylib/src" });
+    exe.linkLibrary(raylib);
 
     const run_cmd = b.addRunArtifact(exe);
 

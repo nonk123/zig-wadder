@@ -144,29 +144,4 @@ pub const Map = struct {
         _ = allocator;
         _ = self;
     }
-
-    pub fn debugAsciiArt(self: *const Map, comptime gridWidth: usize, comptime gridHeight: usize, comptime gridCenterX: i16, comptime gridCenterY: i16, comptime zoom: i16) void {
-        var buf: [gridHeight][gridWidth]u8 = undefined;
-
-        for (0..gridHeight) |y| {
-            for (0..gridWidth) |x| {
-                buf[y][x] = ' ';
-            }
-        }
-
-        for (self.vertices) |vertex| {
-            const x = @divTrunc(vertex.x, zoom) + gridCenterX;
-            const y = @divTrunc(vertex.y, zoom) + gridCenterY;
-
-            if (x < 0 or y < 0 or x >= gridWidth or y >= gridHeight) {
-                continue;
-            }
-
-            buf[@intCast(y)][@intCast(x)] = '*';
-        }
-
-        for (buf) |line| {
-            std.debug.print("{s}\n", .{line});
-        }
-    }
 };

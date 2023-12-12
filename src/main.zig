@@ -2,6 +2,7 @@ const std = @import("std");
 
 const wad = @import("wad.zig");
 const map = @import("map.zig");
+const render = @import("render.zig");
 
 pub const Texture = struct {};
 
@@ -33,5 +34,8 @@ pub fn main() !void {
     var level = try map.Map.loadByName(&iwad, "MAP01", mapAlloc);
     defer level.deinit(mapAlloc);
 
-    level.debugAsciiArt(64, 64, 32, 0, 32);
+    var renderer = render.Renderer.init();
+    defer renderer.deinit();
+
+    return renderer.run(&level);
 }
