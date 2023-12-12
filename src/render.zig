@@ -26,6 +26,8 @@ pub const Renderer = struct {
         rl.InitAudioDevice();
         defer rl.CloseAudioDevice();
 
+        rl.SetTargetFPS(60);
+
         while (!rl.WindowShouldClose()) {
             rl.BeginDrawing();
             defer rl.EndDrawing();
