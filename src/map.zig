@@ -27,12 +27,19 @@ pub const Map = struct {
     lines: []Line,
     sectors: []Sector,
 
+    allocator: std.mem.Allocator,
+
     pub const LoadError = std.mem.Allocator.Error || error{
         MapStartLumpNotFound,
         InvalidLumpOrder,
         InvalidLumpLength,
     };
 
+    /// Load a named map from a WAD.
+    ///
+    /// The returned object owns the allocated memory. Make sure to call `deinit` when done using it!
+    ///
+    /// `allocator` is cached and must be available up until `deinit` is called.
     pub fn loadByName(containingWad: *const wad.Wad, mapName: [:0]const u8, allocator: std.mem.Allocator) LoadError!Map {
         const startIdx = containingWad.findLump(mapName) orelse {
             return LoadError.MapStartLumpNotFound;
@@ -63,6 +70,7 @@ pub const Map = struct {
             .vertices = undefined,
             .lines = undefined,
             .sectors = &[0]Sector{},
+            .allocator = allocator,
         };
 
         inline for (lumpOrder) |order| {
@@ -72,7 +80,7 @@ pub const Map = struct {
                 return LoadError.InvalidLumpOrder;
             }
 
-            order[1](&map, &dataLump, allocator) catch |err| {
+            order[1](&map, &dataLump) catch |err| {
                 return err;
             };
 
@@ -82,36 +90,35 @@ pub const Map = struct {
         return map;
     }
 
-    pub fn deinit(self: *Map, allocator: std.mem.Allocator) void {
-        allocator.free(self.name);
+    pub fn deinit(self: *Map) void {
+        self.allocator.free(self.name);
 
         if (self.vertices.len != 0) {
-            allocator.free(self.vertices);
+            self.allocator.free(self.vertices);
         }
 
         if (self.lines.len != 0) {
-            allocator.free(self.lines);
+            self.allocator.free(self.lines);
         }
 
         if (self.sectors.len != 0) {
-            allocator.free(self.sectors);
+            self.allocator.free(self.sectors);
         }
     }
 
-    fn expect(self: *Map, dataLump: *const wad.Lump, allocator: std.mem.Allocator) LoadError!void {
+    fn expect(self: *Map, dataLump: *const wad.Lump) LoadError!void {
         _ = dataLump;
-        _ = allocator;
         _ = self;
     }
 
-    fn loadPacked(self: *Map, dataLump: *const wad.Lump, allocator: std.mem.Allocator, comptime elementSize: usize, comptime destType: type, comptime destField: []const u8, comptime fields: anytype) LoadError!void {
+    fn loadPacked(self: *Map, dataLump: *const wad.Lump, comptime elementSize: usize, comptime destType: type, comptime destField: []const u8, comptime fields: anytype) LoadError!void {
         if (@mod(dataLump.data.len, elementSize) != 0) {
             return LoadError.InvalidLumpLength;
         }
 
-        @field(self, destField) = try allocator.alloc(destType, dataLump.data.len / elementSize);
+        @field(self, destField) = try self.allocator.alloc(destType, dataLump.data.len / elementSize);
         var dest = @field(self, destField);
-        errdefer allocator.free(dest);
+        errdefer self.allocator.free(dest);
 
         for (0..dest.len) |idx| {
             const offset = idx * elementSize;
@@ -125,8 +132,8 @@ pub const Map = struct {
         }
     }
 
-    fn loadLinedefs(self: *Map, dataLump: *const wad.Lump, allocator: std.mem.Allocator) LoadError!void {
-        return self.loadPacked(dataLump, allocator, 14, Line, "lines", .{
+    fn loadLinedefs(self: *Map, dataLump: *const wad.Lump) LoadError!void {
+        return self.loadPacked(dataLump, 14, Line, "lines", .{
             .{ "startIdx", u16 },
             .{ "endIdx", u16 },
             // TODO: read etc.
@@ -134,22 +141,20 @@ pub const Map = struct {
     }
 
     // TODO.
-    fn loadSidedefs(self: *Map, dataLump: *const wad.Lump, allocator: std.mem.Allocator) LoadError!void {
+    fn loadSidedefs(self: *Map, dataLump: *const wad.Lump) LoadError!void {
         _ = dataLump;
-        _ = allocator;
         _ = self;
     }
 
-    fn loadVertices(self: *Map, dataLump: *const wad.Lump, allocator: std.mem.Allocator) LoadError!void {
-        return self.loadPacked(dataLump, allocator, 4, Vertex, "vertices", .{
+    fn loadVertices(self: *Map, dataLump: *const wad.Lump) LoadError!void {
+        return self.loadPacked(dataLump, 4, Vertex, "vertices", .{
             .{ "x", i16 },
             .{ "y", i16 },
         });
     }
 
-    fn loadSectors(self: *Map, dataLump: *const wad.Lump, allocator: std.mem.Allocator) LoadError!void {
+    fn loadSectors(self: *Map, dataLump: *const wad.Lump) LoadError!void {
         _ = dataLump;
-        _ = allocator;
         _ = self;
     }
 };

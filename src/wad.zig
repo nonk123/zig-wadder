@@ -11,6 +11,18 @@ pub fn normalizeDoomStr(input: []u8) [:0]u8 {
     return input[0..idx :0];
 }
 
+fn freeLumps(lumps: []Lump, allocator: std.mem.Allocator) void {
+    for (lumps) |lump| {
+        allocator.free(lump.name);
+
+        if (lump.data.len != 0) {
+            allocator.free(lump.data);
+        }
+    }
+
+    allocator.free(lumps);
+}
+
 /// A lump inside a WAD file. Memory is owned by the parent WAD.
 pub const Lump = struct {
     name: [:0]u8,
@@ -33,9 +45,13 @@ pub const Wad = struct {
     identification: [:0]u8,
     lumps: []Lump,
 
+    allocator: std.mem.Allocator,
+
     /// Read a WAD file. Requires an allocator to store the lumps.
     ///
     /// The returned object owns the allocated memory. Make sure to call `deinit` on it afterwards!
+    ///
+    /// `allocator` is cached and must be available up until `deinit` is called.
     pub fn readFromFile(relativePath: []const u8, allocator: std.mem.Allocator) !Wad {
         var file = try std.fs.cwd().openFile(relativePath, .{});
         defer file.close();
@@ -44,11 +60,21 @@ pub const Wad = struct {
         _ = try file.reader().read(&identificationBuf);
 
         var identification = try allocator.alloc(u8, 5);
+        errdefer allocator.free(identification);
+
         std.mem.copy(u8, identification, &identificationBuf);
         identification[4] = 0;
 
         const lumpCount = try file.reader().readIntLittle(u32);
+
         var lumpsBuf = try allocator.alloc(Lump, lumpCount);
+        errdefer freeLumps(lumpsBuf, allocator);
+
+        var wad = Wad{
+            .identification = normalizeDoomStr(identification),
+            .lumps = lumpsBuf,
+            .allocator = allocator,
+        };
 
         const dirAddr = try file.reader().readIntLittle(u32);
 
@@ -63,12 +89,14 @@ pub const Wad = struct {
             _ = try file.reader().read(&lumpNameBuf);
 
             var lumpName = try allocator.alloc(u8, 9);
+            errdefer allocator.free(lumpName);
+
             std.mem.copy(u8, lumpName, &lumpNameBuf);
             lumpName[8] = 0;
 
             // Virtual lumps don't need to be read for data apparently.
             if (lumpSize == 0) {
-                lumpsBuf[lumpIdx] = Lump{
+                wad.lumps[lumpIdx] = Lump{
                     .name = normalizeDoomStr(lumpName),
                     .data = &[0]u8{},
                 };
@@ -79,33 +107,23 @@ pub const Wad = struct {
             try file.seekTo(lumpDataStart);
 
             var data = try allocator.alloc(u8, lumpSize);
+            errdefer allocator.free(data);
+
             _ = try file.reader().read(data);
 
-            lumpsBuf[lumpIdx] = Lump{
+            wad.lumps[lumpIdx] = Lump{
                 .name = normalizeDoomStr(lumpName),
                 .data = data,
             };
         }
 
-        return Wad{
-            .identification = normalizeDoomStr(identification),
-            .lumps = lumpsBuf,
-        };
+        return wad;
     }
 
     /// Free the previously allocated memory.
-    pub fn deinit(self: *Wad, allocator: std.mem.Allocator) void {
-        allocator.free(self.identification);
-
-        for (self.lumps) |lump| {
-            allocator.free(lump.name);
-
-            if (lump.data.len != 0) {
-                allocator.free(lump.data);
-            }
-        }
-
-        allocator.free(self.lumps);
+    pub fn deinit(self: *Wad) void {
+        self.allocator.free(self.identification);
+        freeLumps(self.lumps, self.allocator);
     }
 
     /// Print a summary of WAD contents for debugging. All IO errors are ignored.

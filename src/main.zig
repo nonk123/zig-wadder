@@ -36,7 +36,7 @@ pub const Resources = struct {
 
     fn deinitLevels(self: *Resources) void {
         for (self.levels.items) |*level| {
-            level.deinit(self.allocator);
+            level.deinit();
         }
 
         self.levels.deinit();
@@ -105,7 +105,7 @@ pub fn main() !void {
                 const wadAlloc = wadArena.allocator();
 
                 var curWad = try wad.Wad.readFromFile(args[argIdx + 1], wadAlloc);
-                defer curWad.deinit(wadAlloc);
+                defer curWad.deinit();
 
                 try res.loadFromWad(&curWad);
 
