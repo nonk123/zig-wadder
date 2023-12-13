@@ -35,16 +35,12 @@ pub const Map = struct {
         InvalidLumpLength,
     };
 
-    /// Load a named map from a WAD.
+    /// Load a map given its initial lump index.
     ///
     /// The returned object owns the allocated memory. Make sure to call `deinit` when done using it!
     ///
     /// `allocator` is cached and must be available up until `deinit` is called.
-    pub fn loadByName(containingWad: *const wad.Wad, mapName: [:0]const u8, allocator: std.mem.Allocator) LoadError!Map {
-        const startIdx = containingWad.findLump(mapName) orelse {
-            return LoadError.MapStartLumpNotFound;
-        };
-
+    pub fn loadByLumpIdx(containingWad: *const wad.Wad, startIdx: usize, allocator: std.mem.Allocator) LoadError!Map {
         var idx = startIdx + 1;
 
         const lumpOrder = comptime .{
@@ -61,6 +57,8 @@ pub const Map = struct {
             // .{ "BEHAVIOR", expect },
             //     ^ Hexen only; not interested.
         };
+
+        const mapName = containingWad.lumps[startIdx].name;
 
         var name = try allocator.allocSentinel(u8, mapName.len, 0);
         std.mem.copy(u8, name, mapName);
@@ -88,6 +86,17 @@ pub const Map = struct {
         }
 
         return map;
+    }
+
+    /// Load a named map from a WAD.
+    ///
+    /// See `loadByLumpIndex` for details.
+    pub fn loadByName(containingWad: *const wad.Wad, mapName: [:0]const u8, allocator: std.mem.Allocator) LoadError!Map {
+        const startIdx = containingWad.findLump(mapName) orelse {
+            return LoadError.MapStartLumpNotFound;
+        };
+
+        return loadByLumpIdx(containingWad, startIdx, allocator);
     }
 
     pub fn deinit(self: *Map) void {

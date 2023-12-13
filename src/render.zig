@@ -63,7 +63,6 @@ pub const Renderer = struct {
             }
 
             rl.BeginDrawing();
-            defer rl.EndDrawing();
 
             rl.BeginMode2D(.{
                 .offset = vec2(
@@ -74,7 +73,6 @@ pub const Renderer = struct {
                 .rotation = 0.0,
                 .zoom = 1.0 / 4.0,
             });
-            defer rl.EndMode2D();
 
             rl.ClearBackground(rl.BLACK);
 
@@ -86,6 +84,12 @@ pub const Renderer = struct {
 
                 rl.DrawLineEx(vec2(start.x, -start.y), vec2(end.x, -end.y), 5.0, rl.RED);
             }
+
+            rl.EndMode2D();
+
+            rl.DrawText(level.name, 5, 5, 35, rl.WHITE);
+
+            rl.EndDrawing();
         }
     }
 

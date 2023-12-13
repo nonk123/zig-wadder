@@ -47,9 +47,7 @@ pub const Resources = struct {
 
         while (lumpIdx + 1 < srcWad.lumps.len) {
             if (srcWad.lumps[lumpIdx + 1].nameEql("THINGS")) {
-                const mapName = srcWad.lumps[lumpIdx].name;
-
-                var level = try map.Map.loadByName(srcWad, mapName, self.allocator);
+                var level = try map.Map.loadByLumpIdx(srcWad, lumpIdx, self.allocator);
                 var slot = try self.levels.addOne();
                 slot.* = level;
 
