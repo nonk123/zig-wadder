@@ -22,6 +22,7 @@ pub const Sector = struct {
 };
 
 pub const Map = struct {
+    name: [:0]u8,
     vertices: []Vertex,
     lines: []Line,
     sectors: []Sector,
@@ -54,10 +55,14 @@ pub const Map = struct {
             //     ^ Hexen only; not interested.
         };
 
+        var name = try allocator.allocSentinel(u8, mapName.len, 0);
+        std.mem.copy(u8, name, mapName);
+
         var map = Map{
+            .name = name,
             .vertices = undefined,
             .lines = undefined,
-            .sectors = undefined,
+            .sectors = &[0]Sector{},
         };
 
         inline for (lumpOrder) |order| {
@@ -78,6 +83,8 @@ pub const Map = struct {
     }
 
     pub fn deinit(self: *Map, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+
         if (self.vertices.len != 0) {
             allocator.free(self.vertices);
         }

@@ -1,5 +1,6 @@
 const std = @import("std");
 
+/// Convert a string terminated with one or multiple NULLs into a singly terminated string.
 pub fn normalizeDoomStr(input: []u8) [:0]u8 {
     var idx = input.len;
 
@@ -10,15 +11,24 @@ pub fn normalizeDoomStr(input: []u8) [:0]u8 {
     return input[0..idx :0];
 }
 
+/// A lump inside a WAD file. Memory is owned by the parent WAD.
 pub const Lump = struct {
     name: [:0]u8,
     data: []u8,
 
+    /// Check if the name of the lump is equal to `arg`.
+    ///
+    /// `std.mem.eql` might be unsuitable for this use case due to zero or even multiple terminating NULLs in DOOM strings.
     pub fn nameEql(self: *const Lump, arg: [:0]const u8) bool {
         return std.mem.orderZ(u8, self.name, arg) == std.math.Order.eq;
     }
 };
 
+/// A complete WAD file with all the lump data loaded into RAM.
+///
+/// Does not give an insight into its contents besides the "raw" lump data. For that, see the following structs:
+///
+/// - `map.Map`.
 pub const Wad = struct {
     identification: [:0]u8,
     lumps: []Lump,
@@ -98,6 +108,7 @@ pub const Wad = struct {
         allocator.free(self.lumps);
     }
 
+    /// Print a summary of WAD contents for debugging. All IO errors are ignored.
     pub fn debugPrintContents(self: *const Wad) void {
         std.debug.print("Loaded {s}. Lumps:\n\n", .{self.identification});
 
