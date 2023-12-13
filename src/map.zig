@@ -41,8 +41,6 @@ pub const Map = struct {
     ///
     /// `allocator` is cached and must be available up until `deinit` is called.
     pub fn loadByLumpIdx(containingWad: *const wad.Wad, startIdx: usize, allocator: std.mem.Allocator) LoadError!Map {
-        var idx = startIdx + 1;
-
         const lumpOrder = comptime .{
             .{ "THINGS", expect },
             .{ "LINEDEFS", loadLinedefs },
@@ -70,6 +68,8 @@ pub const Map = struct {
             .sectors = &[0]Sector{},
             .allocator = allocator,
         };
+
+        var idx = startIdx + 1;
 
         inline for (lumpOrder) |order| {
             const dataLump = containingWad.lumps[idx];

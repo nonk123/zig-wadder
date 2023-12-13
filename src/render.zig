@@ -2,23 +2,31 @@ const std = @import("std");
 
 const root = @import("root");
 const map = @import("map.zig");
-pub const rl = @cImport(@cInclude("raylib.h"));
 
-pub fn vec2(x: anytype, y: anytype) rl.Vector2 {
-    return rl.Vector2{
-        .x = @floatFromInt(x),
-        .y = @floatFromInt(y),
-    };
+pub const rl = @cImport({
+    @cInclude("raylib.h");
+    @cInclude("raymath.h");
+});
+
+pub fn vec2(x: f32, y: f32) rl.Vector2 {
+    return .{ .x = x, .y = y };
+}
+
+pub fn vec3(x: f32, y: f32, z: f32) rl.Vector3 {
+    return .{ .x = x, .y = y, .z = z };
 }
 
 pub const Renderer = struct {
     curLevel: usize,
-    center: rl.Vector2,
+
+    cameraPos: rl.Vector3,
+    angle: f32,
 
     pub fn init() Renderer {
         return .{
             .curLevel = 0,
-            .center = vec2(0, 0),
+            .cameraPos = vec3(0.0, 0.0, 0.0),
+            .angle = rl.PI * 0.5,
         };
     }
 
@@ -32,23 +40,38 @@ pub const Renderer = struct {
         rl.SetTargetFPS(60);
 
         while (!rl.WindowShouldClose()) {
-            const scrollSpeed = 5120.0 * rl.GetFrameTime();
+            const rotSpeed = 2.0 * rl.PI * rl.GetFrameTime();
+            const scrollSpeed = 2560.0 * rl.GetFrameTime();
+
+            if (rl.IsKeyDown(rl.KEY_Q)) {
+                self.angle += rotSpeed;
+            }
+
+            if (rl.IsKeyDown(rl.KEY_E)) {
+                self.angle -= rotSpeed;
+            }
+
+            var delta = vec2(0.0, 0.0);
 
             if (rl.IsKeyDown(rl.KEY_A)) {
-                self.center.x -= scrollSpeed;
+                delta.x -= scrollSpeed;
             }
 
             if (rl.IsKeyDown(rl.KEY_D)) {
-                self.center.x += scrollSpeed;
+                delta.x += scrollSpeed;
             }
 
             if (rl.IsKeyDown(rl.KEY_W)) {
-                self.center.y -= scrollSpeed;
+                delta.y += scrollSpeed;
             }
 
             if (rl.IsKeyDown(rl.KEY_S)) {
-                self.center.y += scrollSpeed;
+                delta.y -= scrollSpeed;
             }
+
+            const deltaRot = rl.Vector2Rotate(delta, self.angle);
+            self.cameraPos.x += deltaRot.x;
+            self.cameraPos.y += deltaRot.y;
 
             if (rl.IsKeyPressed(rl.KEY_R)) {
                 if (self.curLevel < res.levels.items.len - 1) {
@@ -64,14 +87,15 @@ pub const Renderer = struct {
 
             rl.BeginDrawing();
 
-            rl.BeginMode2D(.{
-                .offset = vec2(
-                    @divTrunc(rl.GetScreenWidth(), 2),
-                    @divTrunc(rl.GetScreenHeight(), 2),
-                ),
-                .target = self.center,
-                .rotation = 0.0,
-                .zoom = 1.0 / 4.0,
+            const dir = vec3(-@sin(self.angle), @cos(self.angle), 0.0);
+            const target = rl.Vector3Add(self.cameraPos, dir);
+
+            rl.BeginMode3D(.{
+                .fovy = 45.0,
+                .projection = rl.CAMERA_PERSPECTIVE,
+                .up = vec3(0.0, 0.0, 1.0),
+                .position = self.cameraPos,
+                .target = target,
             });
 
             rl.ClearBackground(rl.BLACK);
@@ -82,10 +106,25 @@ pub const Renderer = struct {
                 const start = level.vertices[line.startIdx];
                 const end = level.vertices[line.endIdx];
 
-                rl.DrawLineEx(vec2(start.x, -start.y), vec2(end.x, -end.y), 5.0, rl.RED);
+                const sx: f32 = @floatFromInt(start.x);
+                const sy: f32 = @floatFromInt(start.y);
+
+                const ex: f32 = @floatFromInt(end.x);
+                const ey: f32 = @floatFromInt(end.y);
+
+                const h: f32 = 64.0;
+
+                var points = [4]rl.Vector3{
+                    vec3(sx, sy, -h),
+                    vec3(sx, sy, h),
+                    vec3(ex, ey, -h),
+                    vec3(ex, ey, h),
+                };
+
+                rl.DrawTriangleStrip3D(&points, 4, rl.WHITE);
             }
 
-            rl.EndMode2D();
+            rl.EndMode3D();
 
             rl.DrawText(level.name, 5, 5, 35, rl.WHITE);
 
