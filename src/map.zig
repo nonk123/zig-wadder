@@ -1,6 +1,14 @@
 const std = @import("std");
 
 const wad = @import("wad.zig");
+const specials = @import("specials.zig");
+
+pub const LineFlags = struct {
+    const BLOCK_PLAYERS_MONSTERS = 1 << 0;
+    const BLOCK_MONSTERS = 1 << 1;
+    const TWO_SIDED = 1 << 2;
+    // TODO: add more flags.
+};
 
 pub const Vertex = struct {
     x: i16,
@@ -12,9 +20,13 @@ pub const Line = struct {
     endIdx: u16,
     flags: u16,
     special: u16,
-    sector: u16,
-    frontSidedef: u16,
-    backSidedef: u16,
+    sectorIdx: u16,
+    frontSidedefIdx: u16,
+    backSidedefIdx: u16,
+
+    pub fn getSpecial(self: *const Line) specials.Special {
+        return specials.list[self.special];
+    }
 };
 
 pub const Sector = struct {
@@ -145,6 +157,11 @@ pub const Map = struct {
         return self.loadPacked(dataLump, 14, Line, "lines", .{
             .{ "startIdx", u16 },
             .{ "endIdx", u16 },
+            .{ "flags", u16 },
+            .{ "special", u16 },
+            .{ "sectorIdx", u16 },
+            .{ "frontSidedefIdx", u16 },
+            .{ "backSidedefIdx", u16 },
             // TODO: read etc.
         });
     }

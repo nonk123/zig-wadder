@@ -34,14 +34,18 @@ pub const Renderer = struct {
         rl.InitWindow(800, 600, "zig-wadder");
         defer rl.CloseWindow();
 
+        const shader =
+            rl.LoadShaderFromMemory(@embedFile("vertex.glsl"), @embedFile("fragment.glsl"));
+        defer rl.UnloadShader(shader);
+
         rl.InitAudioDevice();
         defer rl.CloseAudioDevice();
 
         rl.SetTargetFPS(60);
 
         while (!rl.WindowShouldClose()) {
-            const rotSpeed = 2.0 * rl.PI * rl.GetFrameTime();
-            const scrollSpeed = 2560.0 * rl.GetFrameTime();
+            const rotSpeed = rl.PI * rl.GetFrameTime();
+            const scrollSpeed = 12.0 * rl.GetFrameTime();
 
             if (rl.IsKeyDown(rl.KEY_Q)) {
                 self.angle += rotSpeed;
@@ -91,40 +95,49 @@ pub const Renderer = struct {
             const target = rl.Vector3Add(self.cameraPos, dir);
 
             rl.BeginMode3D(.{
-                .fovy = 45.0,
+                .fovy = 40.0,
                 .projection = rl.CAMERA_PERSPECTIVE,
                 .up = vec3(0.0, 0.0, 1.0),
                 .position = self.cameraPos,
                 .target = target,
             });
+            rl.BeginShaderMode(shader);
 
             rl.ClearBackground(rl.BLACK);
 
             const level = res.levels.items[self.curLevel];
 
             for (level.lines) |line| {
+                const color = switch (line.getSpecial()) {
+                    .Door => rl.RED,
+                    else => rl.WHITE,
+                };
+
                 const start = level.vertices[line.startIdx];
                 const end = level.vertices[line.endIdx];
 
-                const sx: f32 = @floatFromInt(start.x);
-                const sy: f32 = @floatFromInt(start.y);
+                const scale = 1.0 / 32.0;
 
-                const ex: f32 = @floatFromInt(end.x);
-                const ey: f32 = @floatFromInt(end.y);
+                const sx: f32 = @as(f32, @floatFromInt(start.x)) * scale;
+                const sy: f32 = @as(f32, @floatFromInt(start.y)) * scale;
 
-                const h: f32 = 64.0;
+                const ex: f32 = @as(f32, @floatFromInt(end.x)) * scale;
+                const ey: f32 = @as(f32, @floatFromInt(end.y)) * scale;
+
+                const h: f32 = 128.0 * scale;
 
                 var points = [4]rl.Vector3{
                     vec3(sx, sy, -h),
-                    vec3(sx, sy, h),
                     vec3(ex, ey, -h),
+                    vec3(sx, sy, h),
                     vec3(ex, ey, h),
                 };
 
-                rl.DrawTriangleStrip3D(&points, 4, rl.WHITE);
+                rl.DrawTriangleStrip3D(&points, 4, color);
             }
 
             rl.EndMode3D();
+            rl.EndShaderMode();
 
             rl.DrawText(level.name, 5, 5, 35, rl.WHITE);
 
